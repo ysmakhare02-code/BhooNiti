@@ -1,0 +1,6 @@
+{
+  "name": "BhooNiti",
+  "description": "AI-Powered Land Acquisition Delay Risk & Decision-Support System - Predictive analytics, explainable risk factors, stage-wise lifecycle tracking, what-if simulations, and audit trails for authorized government officers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
