@@ -24,21 +24,108 @@ import { generateAlerts } from './data/alerts';
 import { translations, setupAutoTranslation } from './data/translations';
 import { isTabPermitted } from './data/auth';
 
+const STORAGE_USER_KEY = 'bhooniti_session_user';
+const STORAGE_TAB_KEY = 'bhooniti_current_tab';
+const STORAGE_LANG_KEY = 'bhooniti_language';
+
 export default function App() {
-  const [currentLang, setCurrentLang] = useState<Language>('en');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [currentLang, setCurrentLang] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_LANG_KEY) as Language;
+      return saved && translations[saved] ? saved : 'en';
+    } catch {
+      return 'en';
+    }
+  });
+
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_USER_KEY);
+      return saved ? (JSON.parse(saved) as AuthUser) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_USER_KEY);
+      return Boolean(saved);
+    } catch {
+      return false;
+    }
+  });
+
   const [logoutNotice, setLogoutNotice] = useState<string | null>(null);
   const [loginMode, setLoginMode] = useState<'signin' | 'register'>('signin');
 
-  const [currentRole, setCurrentRole] = useState<UserRole>('DISTRICT_OFFICER');
-  const [currentTab, setCurrentTab] = useState<NavigationTab>('dashboard');
+  const [currentRole, setCurrentRole] = useState<UserRole>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_USER_KEY);
+      if (saved) {
+        const u = JSON.parse(saved) as AuthUser;
+        if (u && u.role) return u.role;
+      }
+    } catch {}
+    return 'DISTRICT_OFFICER';
+  });
+
+  const [currentTab, setCurrentTab] = useState<NavigationTab>(() => {
+    try {
+      const savedUser = localStorage.getItem(STORAGE_USER_KEY);
+      const savedTab = localStorage.getItem(STORAGE_TAB_KEY) as NavigationTab;
+      if (savedUser && savedTab) {
+        const u = JSON.parse(savedUser) as AuthUser;
+        if (u && isTabPermitted(u.role, savedTab)) {
+          return savedTab;
+        }
+      }
+    } catch {}
+    return 'dashboard';
+  });
+
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [alerts, setAlerts] = useState<AlertNotification[]>(initialAlerts);
+  const [alerts, setAlerts] = useState<AlertNotification[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_USER_KEY);
+      if (saved) {
+        const u = JSON.parse(saved) as AuthUser;
+        return generateAlerts(initialProjects, u);
+      }
+    } catch {}
+    return initialAlerts;
+  });
   const [highContrast, setHighContrast] = useState<boolean>(false);
   const [projectSearchQuery, setProjectSearchQuery] = useState<string>('');
   const [selectedParcelForDossier, setSelectedParcelForDossier] = useState<LandParcel | null>(null);
+
+  // Sync session authentication to localStorage
+  useEffect(() => {
+    try {
+      if (currentUser && isAuthenticated) {
+        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(currentUser));
+      } else {
+        localStorage.removeItem(STORAGE_USER_KEY);
+      }
+    } catch {}
+  }, [currentUser, isAuthenticated]);
+
+  // Sync current tab to localStorage
+  useEffect(() => {
+    try {
+      if (isAuthenticated) {
+        localStorage.setItem(STORAGE_TAB_KEY, currentTab);
+      }
+    } catch {}
+  }, [currentTab, isAuthenticated]);
+
+  // Sync language selection to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_LANG_KEY, currentLang);
+    } catch {}
+  }, [currentLang]);
 
   const t = translations[currentLang];
 
@@ -164,6 +251,11 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    try {
+      localStorage.removeItem(STORAGE_USER_KEY);
+      localStorage.removeItem(STORAGE_TAB_KEY);
+      sessionStorage.clear();
+    } catch {}
     setIsAuthenticated(false);
     setCurrentUser(null);
     setSelectedProjectId(null);
@@ -174,6 +266,11 @@ export default function App() {
   };
 
   const handleSwitchDemoAccount = () => {
+    try {
+      localStorage.removeItem(STORAGE_USER_KEY);
+      localStorage.removeItem(STORAGE_TAB_KEY);
+      sessionStorage.clear();
+    } catch {}
     setIsAuthenticated(false);
     setCurrentUser(null);
     setSelectedProjectId(null);
@@ -183,6 +280,11 @@ export default function App() {
   };
 
   const handleRegisterNewAccount = () => {
+    try {
+      localStorage.removeItem(STORAGE_USER_KEY);
+      localStorage.removeItem(STORAGE_TAB_KEY);
+      sessionStorage.clear();
+    } catch {}
     setIsAuthenticated(false);
     setCurrentUser(null);
     setSelectedProjectId(null);

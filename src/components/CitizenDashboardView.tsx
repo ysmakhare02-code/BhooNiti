@@ -108,14 +108,24 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
     }
   }, [citizenId, isLandOwner, ownedParcels]);
 
-  // Navigation tab state with back history tracking
-  const [activeTab, setActiveTab] = useState<CitizenTab>('project-overview');
+  // Navigation tab state with back history tracking and refresh persistence
+  const [activeTab, setActiveTab] = useState<CitizenTab>(() => {
+    try {
+      const saved = sessionStorage.getItem('bhooniti_citizen_tab') as CitizenTab;
+      return saved || 'project-overview';
+    } catch {
+      return 'project-overview';
+    }
+  });
   const [tabHistory, setTabHistory] = useState<CitizenTab[]>(['project-overview']);
 
   const navigateToTab = (newTab: CitizenTab) => {
     if (newTab !== activeTab) {
       setTabHistory((prev) => [...prev, activeTab]);
       setActiveTab(newTab);
+      try {
+        sessionStorage.setItem('bhooniti_citizen_tab', newTab);
+      } catch {}
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -125,8 +135,14 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
       const prev = tabHistory[tabHistory.length - 1];
       setTabHistory((h) => h.slice(0, -1));
       setActiveTab(prev);
+      try {
+        sessionStorage.setItem('bhooniti_citizen_tab', prev);
+      } catch {}
     } else {
       setActiveTab('project-overview');
+      try {
+        sessionStorage.setItem('bhooniti_citizen_tab', 'project-overview');
+      } catch {}
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -155,20 +171,33 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
   // When a non-landowner directly navigates to 'my-land-details', an explicit Access Denied screen is displayed.
 
   // 3. OTP VERIFICATION STATE FOR "MY LAND DETAILS"
-  // Authenticated Citizen && Citizen ID === Land Owner ID && OTP Verified
-  const [isOtpVerified, setIsOtpVerified] = useState<boolean>(false);
+  // Authenticated Citizen && Citizen ID === Land Owner ID && OTP Verified (persisted per session)
+  const [isOtpVerified, setIsOtpVerified] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(`bhooniti_otp_verified_${citizenId}`) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [otpInput, setOtpInput] = useState<string>('');
   const [otpError, setOtpError] = useState<string | null>(null);
   const [generatedOtp, setGeneratedOtp] = useState<string>('742918');
   const [otpSuccessToast, setOtpSuccessToast] = useState<boolean>(false);
   const [showCitizenProfile, setShowCitizenProfile] = useState<boolean>(false);
 
-  // Reset OTP status if citizen account changes
+  // Reset OTP status only if citizen account actually switches to a different citizen ID
+  const prevCitizenIdRef = React.useRef(citizenId);
   useEffect(() => {
-    setIsOtpVerified(false);
-    setOtpInput('');
-    setOtpError(null);
-    setShowParcelModal(false);
+    if (prevCitizenIdRef.current !== citizenId) {
+      prevCitizenIdRef.current = citizenId;
+      setIsOtpVerified(false);
+      try {
+        sessionStorage.removeItem(`bhooniti_otp_verified_${citizenId}`);
+      } catch {}
+      setOtpInput('');
+      setOtpError(null);
+      setShowParcelModal(false);
+    }
   }, [citizenId]);
 
   const handleVerifyOtp = (e: React.FormEvent) => {
@@ -181,6 +210,9 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
     // Accept either the generated OTP or standard test code 123456
     if (clean === generatedOtp || clean === '123456') {
       setIsOtpVerified(true);
+      try {
+        sessionStorage.setItem(`bhooniti_otp_verified_${citizenId}`, 'true');
+      } catch {}
       setOtpError(null);
       setOtpSuccessToast(true);
       setTimeout(() => setOtpSuccessToast(false), 4000);
@@ -198,6 +230,9 @@ export const CitizenDashboardView: React.FC<CitizenDashboardViewProps> = ({
 
   const handleLockLandDetails = () => {
     setIsOtpVerified(false);
+    try {
+      sessionStorage.removeItem(`bhooniti_otp_verified_${citizenId}`);
+    } catch {}
     setOtpInput('');
     setOtpError(null);
     setOtpSuccessToast(false);
